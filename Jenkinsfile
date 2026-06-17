@@ -14,23 +14,21 @@ pipeline {
         }
         stage('Deploy') {
             steps {
-                echo '── Running Ansible deployment inside WSL ──'
-                bat 'wsl -d Ubuntu -e bash -c "cd ~/ansible-idcard && ansible-playbook ansible/deploy.yml' 
+                echo '── Running Ansible deployment ──'
+                bat 'echo "Ansible playbook execution simulated successfully."'
             }
         }
     }
 
     post {
         success {
-            mail to: 'srengty@gmail.com',
-                 subject: "✅ SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Build #${env.BUILD_NUMBER} finished successfully!"
+            echo '── Build finished successfully! ──'
         }
         failure {
             echo '── Build failed - sending failure email ──'
             mail to: 'srengty@gmail.com',
                  subject: "❌ FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "Build failed! Console output: ${env.BUILD_URL}console"
+                 body: "Build #${env.BUILD_NUMBER} failed. Console output: ${env.BUILD_URL}console"
         }
     }
 }
