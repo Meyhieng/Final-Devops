@@ -15,7 +15,7 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo '── Running Ansible deployment inside WSL ──'
-                bat 'wsl ansible-playbook ansible/deploy.yml' 
+                bat 'wsl -d Ubuntu -e bash -c "cd ~/ansible-idcard && ansible-playbook ansible/deploy.yml' 
             }
         }
     }
