@@ -1,0 +1,122 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      # Use SQLite for tests (matches your Ansible playbook setup)
+      - name: Run tests with SQLite
+        run: mvn test -Dspring.profiles.active=test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:sqlite:./test.db
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.sqlite.JDBC
+          SPRING_JPA_DATABASE_PLATFORM: org.hibernate.community.dialect.SQLiteDialect
+          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+
+      - name: Build with Maven (skip tests — already ran)
+        run: mvn package -DskipTests
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: target/*.jar
+          retention-days: 1
+
+  notify-on-failure:
+    name: Notify on Build Failure
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: failure()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # need at least 2 commits to get author info
+
+      - name: Get committer info
+        id: committer
+        run: |
+          echo "name=$(git log -1 --pretty=format:'%an')" >> $GITHUB_OUTPUT
+          echo "email=$(git log -1 --pretty=format:'%ae')" >> $GITHUB_OUTPUT
+          echo "message=$(git log -1 --pretty=format:'%s')" >> $GITHUB_OUTPUT
+          echo "sha=$(git log -1 --pretty=format:'%H')" >> $GITHUB_OUTPUT
+
+      - name: Send failure email (to instructor + committer)
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          secure: false
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          # Always CC the instructor; TO is the committer
+          to: ${{ steps.committer.outputs.email }}
+          cc: srengty@gmail.com
+          from: "GitHub Actions <${{ secrets.MAIL_USERNAME }}>"
+          subject: "❌ FAILED: idcard-pipeline #${{ github.run_number }} — ${{ steps.committer.outputs.message }}"
+          body: |
+            Build failed for commit by ${{ steps.committer.outputs.name }}.
+
+            Repository : ${{ github.repository }}
+            Branch     : ${{ github.ref_name }}
+            Commit     : ${{ steps.committer.outputs.sha }}
+            Message    : ${{ steps.committer.outputs.message }}
+            Committer  : ${{ steps.committer.outputs.name }} <${{ steps.committer.outputs.email }}>
+            Run URL    : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Please check the console output at the link above and fix the errors.
+
+  deploy:
+    name: Deploy via Ansible
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: success() && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ansible
+
+      - name: Write SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ANSIBLE_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.ANSIBLE_SSH_PORT || '2222' }} \
+            ${{ secrets.ANSIBLE_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Write Ansible inventory
+        run: |
+          cat > inventory.ini << EOF
+          [web]
+          ${{ secrets.ANSIBLE_HOST }} ansible_port=${{ secrets.ANSIBLE_SSH_PORT || '2222' }} ansible_user=root ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+          EOF
+
+      - name: Run Ansible playbook
+        run: ansible-playbook -i inventory.ini playbook.yml
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
