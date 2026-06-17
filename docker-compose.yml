@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+
+  web:
+    image: ubuntu:22.04
+    container_name: web-server
+    ports:
+      - "8443:8443"
+      - "2222:22"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/A-SAN_Meyhieng-db
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=Hello@123
+    depends_on:
+      - db
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    command: >
+      bash -c "
+        apt-get update &&
+        apt-get install -y openjdk-21-jdk nginx git openssh-server &&
+        mkdir -p /var/run/sshd &&
+        echo 'root:root' | chpasswd &&
+        sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config &&
+        sed -i 's/#Port 22/Port 22/' /etc/ssh/sshd_config &&
+        service ssh start &&
+        git clone https://github.com/Meyhieng/Final-Devops.git /app &&
+        cd /app &&
+        chmod +x mvnw &&
+        nginx &&
+        ./mvnw spring-boot:run -Dspring-boot.run.profiles=docker
+      "
+    networks:
+      - idcard-network
+
+  db:
+    image: mysql:8.0
+    container_name: mysql-db
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: Hello@123
+      MYSQL_DATABASE: A-SAN_Meyhieng-db
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - idcard-network
+
+networks:
+  idcard-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
