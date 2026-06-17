@@ -2,65 +2,102 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven3'
-        jdk 'JDK21'
+        maven 'Maven'
+        jdk 'JDK17'
     }
 
     triggers {
-        pollSCM('H/5 * * * *')   
+        pollSCM('H/5 * * * *')
     }
 
     environment {
-        EMAIL_TO = "srengty@gmail.com"
+        DEVELOPER_EMAIL = ''
+        CC_EMAIL = 'srengty@gmail.com'
+        GIT_REPO = 'https://github.com/YOUR_USERNAME/idcard-management.git'
+        ANSIBLE_PLAYBOOK = 'ansible/deploy.yml'
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/Meyhieng/Final-Devops.git'
+                echo '── Cloning repository ──'
+                git branch: 'main',
+                    url: "${GIT_REPO}"
+                script {
+                    DEVELOPER_EMAIL = sh(
+                        script: "git log -1 --pretty=format:'%ae'",
+                        returnStdout: true
+                    ).trim()
+                    echo "Last commit by: ${DEVELOPER_EMAIL}"
+                }
             }
         }
 
-        stage('Clean Build') {
+        stage('Build') {
             steps {
-                sh 'mvn clean compile'
+                echo '── Building with Maven ──'
+                sh './mvnw clean package -DskipTests'
             }
         }
 
         stage('Test') {
             steps {
-                sh 'mvn test'
+                echo '── Running Tests ──'
+                sh './mvnw test'
             }
-        }
-
-        stage('Package') {
-            steps {
-                sh 'mvn package -DskipTests'
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'
+                }
             }
         }
 
         stage('Deploy with Ansible') {
+            when {
+                expression {
+                    currentBuild.result == null || currentBuild.result == 'SUCCESS'
+                }
+            }
             steps {
-                sh 'ansible-playbook -i inventory deploy.yml'
+                echo '── Deploying via Ansible ──'
+                sh "ansible-playbook ${ANSIBLE_PLAYBOOK}"
             }
         }
     }
 
     post {
-
-        success {
-            echo 'BUILD SUCCESSFUL'
-
-            archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
-        }
-
         failure {
-            echo 'BUILD FAILED'
+            echo '── Build FAILED — sending email ──'
+            mail to: "${DEVELOPER_EMAIL}, ${CC_EMAIL}",
+                 subject: "❌ Jenkins Build FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: """
+Build failed for job: ${env.JOB_NAME}
+Build number: ${env.BUILD_NUMBER}
+Branch: ${env.GIT_BRANCH}
+Committed by: ${DEVELOPER_EMAIL}
 
-            mail to: "${EMAIL_TO}",
-                 subject: "Jenkins Build FAILED - ${env.JOB_NAME}",
-                 body: "Check here: ${env.BUILD_URL}"
+Check console output:
+${env.BUILD_URL}console
+
+Regards,
+Jenkins CI
+"""
+        }
+        success {
+            echo '── Build SUCCEEDED ──'
+            mail to: "${DEVELOPER_EMAIL}, ${CC_EMAIL}",
+                 subject: "✅ Jenkins Build SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: """
+Build succeeded for job: ${env.JOB_NAME}
+Build number: ${env.BUILD_NUMBER}
+
+Check console output:
+${env.BUILD_URL}console
+
+Regards,
+Jenkins CI
+"""
         }
     }
 }
