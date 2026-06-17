@@ -14,8 +14,8 @@ pipeline {
         }
         stage('Deploy') {
             steps {
-                echo '── Running Ansible deployment ──'
-                bat 'ansible-playbook ansible/deploy.yml' 
+                echo '── Running Ansible deployment inside WSL ──'
+                bat 'wsl ansible-playbook ansible/deploy.yml' 
             }
         }
     }
