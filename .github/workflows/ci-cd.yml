@@ -21,8 +21,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
-
-      # Use SQLite for tests (matches your Ansible playbook setup)
       - name: Run tests with SQLite
         run: mvn test -Dspring.profiles.active=test
         env:
@@ -51,7 +49,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2   # need at least 2 commits to get author info
+          fetch-depth: 2   
 
       - name: Get committer info
         id: committer
