@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ID Card Preview</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f0f0; display: flex; justify-content: center; padding: 40px; }
+        .id-card { width: 340px; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+        .card-header { background: #1d4ed8; color: white; padding: 20px; text-align: center; }
+        .card-header h3 { margin: 0; font-size: 18px; letter-spacing: 2px; }
+        .card-header p { margin: 4px 0 0; font-size: 12px; opacity: 0.8; }
+        .card-body { padding: 20px; }
+        .photo { width: 80px; height: 80px; border-radius: 50%; background: #e0e7ff; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 32px; overflow: hidden; }
+        .photo img { width: 100%; height: 100%; object-fit: cover; }
+        .name { text-align: center; font-size: 18px; font-weight: bold; color: #1d4ed8; }
+        .type-badge { text-align: center; margin: 4px 0 12px; }
+        .badge { background: #e0e7ff; color: #1d4ed8; padding: 2px 12px; border-radius: 12px; font-size: 12px; }
+        .info-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+        .info-row .label { color: #888; }
+        .info-row .value { font-weight: 500; }
+        .card-footer { background: #1d4ed8; color: white; padding: 12px 20px; text-align: center; font-size: 11px; }
+        .reg-num { font-size: 13px; font-weight: bold; letter-spacing: 1px; }
+        .actions { text-align: center; margin-top: 20px; }
+    </style>
+</head>
+<body>
+<div>
+    <div class="id-card">
+        <div class="card-header">
+            <h3>🎓 ID CARD</h3>
+            <p th:text="${profile.template != null ? profile.template.organizationName : 'Institution Name'}"></p>
+        </div>
+        <div class="card-body">
+            <div class="photo">
+                <img th:if="${profile.hasPhoto()}" th:src="@{/uploads/{file}(file=${profile.photoFileName})}" alt="photo">
+                <span th:unless="${profile.hasPhoto()}">👤</span>
+            </div>
+            <div class="name" th:text="${profile.fullName}">Full Name</div>
+            <div class="type-badge">
+                <span class="badge" th:text="${profile.type}">TYPE</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Department</span>
+                <span class="value" th:text="${profile.department ?: '-'}"></span>
+            </div>
+            <div class="info-row">
+                <span class="label">Title</span>
+                <span class="value" th:text="${profile.title ?: '-'}"></span>
+            </div>
+            <div class="info-row">
+                <span class="label">Email</span>
+                <span class="value" th:text="${profile.email ?: '-'}"></span>
+            </div>
+            <div class="info-row">
+                <span class="label">Blood Group</span>
+                <span class="value" th:text="${profile.bloodGroup ?: '-'}"></span>
+            </div>
+            <div class="info-row">
+                <span class="label">Valid Until</span>
+                <span class="value" th:text="${profile.expiryDate ?: '-'}"></span>
+            </div>
+        </div>
+        <div class="card-footer">
+            <div class="reg-num" th:text="${profile.registrationNumber}"></div>
+        </div>
+    </div>
+    <div class="actions">
+        <a th:href="@{/profiles/{id}/pdf(id=${profile.id})}"
+           style="background:#1d4ed8;color:white;padding:10px 24px;border-radius:8px;text-decoration:none;">
+            Export PDF
+        </a>
+        <a href="/profiles"
+           style="background:#888;color:white;padding:10px 24px;border-radius:8px;text-decoration:none;margin-left:8px;">
+            Back
+        </a>
+    </div>
+</div>
+</body>
+</html>
